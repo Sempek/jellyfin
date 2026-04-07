@@ -45,4 +45,9 @@
     </AssemblyAttribute>
   </ItemGroup>
 
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\..\SemPickRewrite\SemPick\SemPick.csproj" />
+  </ItemGroup>
+
 </Project>
