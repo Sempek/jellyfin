@@ -177,11 +177,6 @@ namespace MediaBrowser.MediaEncoding.Encoder
         public bool SetFFmpegPath()
         {
             var skipValidation = _config.GetFFmpegSkipValidation();
-            if (skipValidation)
-            {
-                _logger.LogWarning("FFmpeg: Skipping FFmpeg Validation due to FFmpeg:novalidation set to true");
-                return true;
-            }
 
             // 1) Check if the --ffmpeg CLI switch has been given
             var ffmpegPath = _startupOptionFFmpegPath;
@@ -199,7 +194,7 @@ namespace MediaBrowser.MediaEncoding.Encoder
                 }
             }
 
-            if (!ValidatePath(ffmpegPath))
+            if (!ValidatePath(ffmpegPath, skipValidation))
             {
                 _ffmpegPath = null;
                 _logger.LogError("FFmpeg: Path set by {FfmpegPathSetMethodText} is invalid", ffmpegPathSetMethodText);
@@ -286,19 +281,27 @@ namespace MediaBrowser.MediaEncoding.Encoder
         /// If checks pass, global variable FFmpegPath is updated.
         /// </summary>
         /// <param name="path">FQPN to test.</param>
+        /// <param name="skipValidation">When <c>true</c>, skips version validation and accepts any working ffmpeg binary.</param>
         /// <returns><c>true</c> if the version validation succeeded; otherwise, <c>false</c>.</returns>
-        private bool ValidatePath(string path)
+        private bool ValidatePath(string path, bool skipValidation = false)
         {
             if (string.IsNullOrEmpty(path))
             {
                 return false;
             }
 
-            bool rc = new EncoderValidator(_logger, path).ValidateVersion();
-            if (!rc)
+            if (skipValidation)
             {
-                _logger.LogError("FFmpeg: Failed version check: {Path}", path);
-                return false;
+                _logger.LogWarning("FFmpeg: Skipping version validation for {Path} due to FFmpeg:novalidation=true", path);
+            }
+            else
+            {
+                bool rc = new EncoderValidator(_logger, path).ValidateVersion();
+                if (!rc)
+                {
+                    _logger.LogError("FFmpeg: Failed version check: {Path}", path);
+                    return false;
+                }
             }
 
             _ffmpegPath = path;

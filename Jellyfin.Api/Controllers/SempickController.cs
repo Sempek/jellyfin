@@ -151,7 +151,7 @@ namespace Jellyfin.Api.Controllers
         if (_orchestration is null)
         {
           _logger.LogInformation("Sempick building fragment index (limit={Limit})", limit);
-          var comparer = new KeyboardUtilityComparer<SemPickFragment>(x => x.fragment);
+          var comparer = new KeyboardUtilityComparer<SemPickFragmentOf<JellyFragment>>(x => x.fragment);
           var query = new InternalItemsQuery(user) { Recursive = true, Limit = limit };
           var items = _libraryManager.GetUserRootFolder().GetItemList(query);
           var fragments = InitializeFragmentsWJelly(items, comparer, user);
@@ -205,15 +205,42 @@ namespace Jellyfin.Api.Controllers
       return NoContent();
     }
 
-    private SemPickFragment[] InitializeFragmentsWJelly(IEnumerable<BaseItem> items, IComparer<SemPickFragment> comparer, User? user)
+    private SemPickFragmentOf<JellyFragment>[] InitializeFragmentsWJelly(
+        IEnumerable<BaseItem> items,
+        IComparer<SemPickFragmentOf<JellyFragment>> comparer,
+        User? user)
     {
-      var fragments = items
-        .Where(x => x.Name is not null)
-        .Select((x, i) => new SemPickFragmentWJelly(x.Name.Clean(StringCleaning.CleanCharAllowSpace), 1, i, new JellyFragment(x.Id, x.Name, x), null))
-        .GroupBy(x => x.fragment, (key, dups) => dups.First() with { Jellies = dups.Select(x => x.Jelly).ToArray() })
-        .Order(comparer)
-        .ToArray();
-      return fragments;
+      return SemPickFragmentBuilder.Build(
+          source: items.Where(x => x.Name is not null)
+                       .Select(x => new JellyFragment(x.Id, x.Name, x)),
+          rawNameSelector: x => x.Name,
+          comparer: comparer,
+          disambiguationLabelSelector: DisambiguationLabel);
+    }
+
+    private string DisambiguationLabel(JellyFragment jelly)
+    {
+      var dto = _dtoService.GetBaseItemDto(jelly.Item, new DtoOptions(true));
+      if (!string.IsNullOrWhiteSpace(dto.SeriesName))
+      {
+        var season = dto.ParentIndexNumber.HasValue ? $"s{dto.ParentIndexNumber:D2}" : string.Empty;
+        var episode = dto.IndexNumber.HasValue ? $"e{dto.IndexNumber:D2}" : string.Empty;
+        return $"{jelly.Name} {dto.SeriesName} {season}{episode}";
+      }
+
+      var artist = !string.IsNullOrWhiteSpace(dto.AlbumArtist) ? dto.AlbumArtist
+                 : dto.Artists?.Count > 0 ? dto.Artists[0] : null;
+      if (artist != null)
+      {
+        return $"{jelly.Name} {artist}" + (!string.IsNullOrWhiteSpace(dto.Album) ? $" {dto.Album}" : string.Empty);
+      }
+
+      if (dto.ProductionYear.HasValue)
+      {
+        return $"{jelly.Name} {jelly.Item.GetType().Name} {dto.ProductionYear}";
+      }
+
+      return $"{jelly.Name} {jelly.Item.GetType().Name} {jelly.Id}";
     }
 
     private string EngineResultWJellyDtoToJson(EngineResult engineResult, Func<BaseItem, BaseItemDto> baseItemConverter)
@@ -240,8 +267,6 @@ namespace Jellyfin.Api.Controllers
     }
   }
 
-  public record SemPickFragmentWJelly(string fragment, int Count, int Index, JellyFragment Jelly, JellyFragment[]? Jellies) : SemPickFragment(fragment, Count, Index);
-
   public record JellyFragment(Guid Id, string Name, BaseItem Item);
 
   public record JellyFragmentDto(Guid Id, string Name, BaseItemDto Item);
@@ -261,20 +286,44 @@ namespace Jellyfin.Api.Controllers
       writer.WriteString("fragment", value.fragment);
       writer.WriteNumber("Count", value.Count);
       writer.WriteNumber("Index", value.Index);
-      if (value is SemPickFragmentWJelly jellyFragment && jellyFragment.Jelly is not null)
+
+      // Case 1: ScrollGroupFragment — write GroupItems array (recurse per item)
+      if (value is ScrollGroupFragment group)
       {
-        var jelly = jellyFragment.Jelly;
-        var dto = new JellyFragmentDto(jelly.Id, jelly.Name, _baseItemConverter(jelly.Item));
-        writer.WritePropertyName("Jelly");
-        writer.WriteRawValue(JsonSerializer.Serialize(dto));
-        if (jellyFragment.Jellies?.Any() ?? false)
+        writer.WritePropertyName("GroupItems");
+        writer.WriteStartArray();
+        foreach (var item in group.GroupItems)
         {
-          var itemDtos = jellyFragment.Jellies.Select(x => new JellyFragmentDto(x.Id, x.Name, _baseItemConverter(x.Item)));
-          writer.WritePropertyName("Jellies");
-          writer.WriteRawValue(JsonSerializer.Serialize(itemDtos));
+          Write(writer, item, options);
         }
+
+        writer.WriteEndArray();
+        writer.WriteEndObject();
+        return;
       }
 
+      // Case 2: SemPickFragmentOf<JellyFragment> — write Jelly
+      // Disambiguation items have a cleaned disambiguation label as fragment.fragment
+      // (differs from the cleaned primary name). Emit that as Jelly.Name so the
+      // frontend shows a distinct label in the list.
+      if (value is SemPickFragmentOf<JellyFragment> fof)
+      {
+        var isDisambig = fof.All.Length == 1
+            && !string.Equals(
+                   fof.fragment,
+                   fof.Primary.Name?.Clean(StringCleaning.CleanCharAllowSpace) ?? string.Empty,
+                   StringComparison.Ordinal);
+        var displayName = isDisambig ? fof.fragment : (fof.Primary.Name ?? string.Empty);
+        var dto = _baseItemConverter(fof.Primary.Item);
+        var jellyDto = new JellyFragmentDto(fof.Primary.Id, displayName, dto);
+        writer.WritePropertyName("Jelly");
+        writer.WriteRawValue(JsonSerializer.Serialize(jellyDto));
+        writer.WriteEndObject();
+        return;
+      }
+
+      // Fallback: plain SemPickFragment (control tokens, scroll tokens).
+      // fragment/Count/Index already written; no Jelly property needed.
       writer.WriteEndObject();
     }
 

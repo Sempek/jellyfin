@@ -1,0 +1,37 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(powershell.exe -Command \"cd 'C:\\\\\\\\dev\\\\\\\\jellyfin-branch\\\\\\\\jellyfin'; dotnet build Jellyfin.sln 2>&1 | Where-Object { \\\\$_ -match ': error ' } | Sort-Object -Unique\")",
+      "Bash(ls *.sln *.csproj)",
+      "Bash(ls *.sln)",
+      "Bash(git fetch:*)",
+      "Bash(git stash:*)",
+      "Bash(git checkout:*)",
+      "Bash(git reset:*)",
+      "Bash(find . -name *.csproj -exec grep -l \"SubtitleEdit\\\\|Nikse\" {})",
+      "Bash(2)",
+      "Bash(grep -r \"SubtitleEdit\\\\|Nikse\" --include=*.csproj .)",
+      "Bash(echo 'Not found in csproj' grep -r \"SubtitleEdit\\\\|Nikse\" --include=*.props .)",
+      "Bash(grep -r SubtitleEdit . --include=*.csproj)",
+      "Bash(grep -r SubtitleEdit . --include=*.props)",
+      "Bash(grep -ri subtitle . --include=*.csproj)",
+      "Bash(grep -ri subtitle . --include=*.props)",
+      "Bash(grep -r SubtitleEdit --include=*.csproj -l .)",
+      "Bash(grep -r SubtitleEdit --include=*.csproj src/)",
+      "Bash(grep -r SubtitleEdit --include=*.csproj Emby.Subtitles/)",
+      "Bash(xargs grep:*)",
+      "Bash(ls -d Emby.*)",
+      "Bash(git ls-tree:*)",
+      "Bash(grep -r \"webdir\\\\|webclient\\\\|web-client\\\\|WebDir\\\\|webroot\" Jellyfin.Server/ --include=*.cs -l)",
+      "Bash(dotnet build:*)",
+      "Read(//c/Users/$USER/.nuget/packages/mimetypes/2.5.2/**)",
+      "Read(//c/dev/jellyfin-branch/jellyfin/$USERPROFILE/.nuget/packages/mimetypes/2.5.2/**)",
+      "Bash(find C:/Users/dave/.nuget/packages/mimetypes -name *.dll)",
+      "Bash(dotnet restore:*)",
+      "Bash(find C:/dev/jellyfin-branch/jellyfin/MediaBrowser.Model/obj -name *.cs)",
+      "Bash(npm ci:*)",
+      "Bash(npm run:*)",
+      "Bash(grep -v \"\\\\.cs:[[:space:]]*//\")"
+    ]
+  }
+}

@@ -34,7 +34,16 @@ internal class CodeMigration(Type migrationType, JellyfinMigrationAttribute meta
         {
             if (service.Lifetime == ServiceLifetime.Singleton && !service.ServiceType.IsGenericTypeDefinition)
             {
-                childServiceCollection.AddSingleton(service.ServiceType, _ => serviceProvider.GetService(service.ServiceType)!);
+                // Register via instance (not factory) so the child provider treats the object as
+                // externally-owned and does NOT dispose it when the child ServiceProvider is disposed.
+                // Using a factory delegate here causes the child to take ownership and dispose the
+                // parent's shared singletons (e.g. ILoggerFactory), breaking subsequent migration steps.
+                var instance = serviceProvider.GetService(service.ServiceType);
+                if (instance is not null)
+                {
+                    childServiceCollection.AddSingleton(service.ServiceType, instance);
+                }
+
                 continue;
             }
 
