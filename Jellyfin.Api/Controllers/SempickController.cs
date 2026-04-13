@@ -218,29 +218,16 @@ namespace Jellyfin.Api.Controllers
           disambiguationLabelSelector: DisambiguationLabel);
     }
 
-    private string DisambiguationLabel(JellyFragment jelly)
+    private static string DisambiguationLabel(JellyFragment jelly)
     {
-      var dto = _dtoService.GetBaseItemDto(jelly.Item, new DtoOptions(true));
-      if (!string.IsNullOrWhiteSpace(dto.SeriesName))
+      var item = jelly.Item;
+      var type = item.GetType().Name;
+      if (item.ProductionYear.HasValue)
       {
-        var season = dto.ParentIndexNumber.HasValue ? $"s{dto.ParentIndexNumber:D2}" : string.Empty;
-        var episode = dto.IndexNumber.HasValue ? $"e{dto.IndexNumber:D2}" : string.Empty;
-        return $"{jelly.Name} {dto.SeriesName} {season}{episode}";
+        return $"{jelly.Name} {type} {item.ProductionYear}";
       }
 
-      var artist = !string.IsNullOrWhiteSpace(dto.AlbumArtist) ? dto.AlbumArtist
-                 : dto.Artists?.Count > 0 ? dto.Artists[0] : null;
-      if (artist != null)
-      {
-        return $"{jelly.Name} {artist}" + (!string.IsNullOrWhiteSpace(dto.Album) ? $" {dto.Album}" : string.Empty);
-      }
-
-      if (dto.ProductionYear.HasValue)
-      {
-        return $"{jelly.Name} {jelly.Item.GetType().Name} {dto.ProductionYear}";
-      }
-
-      return $"{jelly.Name} {jelly.Item.GetType().Name} {jelly.Id}";
+      return $"{jelly.Name} {type} {jelly.Id}";
     }
 
     private string EngineResultWJellyDtoToJson(EngineResult engineResult, Func<BaseItem, BaseItemDto> baseItemConverter)
