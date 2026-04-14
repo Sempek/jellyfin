@@ -220,14 +220,7 @@ namespace Jellyfin.Api.Controllers
 
     private static string DisambiguationLabel(JellyFragment jelly)
     {
-      var item = jelly.Item;
-      var type = item.GetType().Name;
-      if (item.ProductionYear.HasValue)
-      {
-        return $"{jelly.Name} {type} {item.ProductionYear}";
-      }
-
-      return $"{jelly.Name} {type} {jelly.Id}";
+      return $"{jelly.Name} {jelly.Id}";
     }
 
     private string EngineResultWJellyDtoToJson(EngineResult engineResult, Func<BaseItem, BaseItemDto> baseItemConverter)
